@@ -1,0 +1,11 @@
+[package]
+name = "rustphie"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+teloxide = { git = "https://github.com/teloxide/teloxide" }
+tokio = { version = "0.2", features = ["macros"] }
+config = { path = "../config" }
+log = "0.4"
+anyhow = "1"
