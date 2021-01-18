@@ -65,7 +65,7 @@ fn create_parser<'a>(
                     }
                 }
             };
-            let mut captures_iter = captures.iter();
+            let mut captures_iter = captures.iter(); captures_iter.next(); // skip first capture, would be always whole-matched region
             let res = (#inner2);
             match splited.next() {
                 Some(d) => Err(ParseError::TooManyArguments {
