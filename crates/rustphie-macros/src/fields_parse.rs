@@ -130,7 +130,7 @@ fn extract_type<'a>(types: impl Iterator<Item = &'a Type>) -> Vec<proc_macro2::T
                                 #ident::#type_
                             }
                         }
-                        rest => rest.to_token_stream()
+                        _ => type_path.to_token_stream()
                     }
                 }
             }
