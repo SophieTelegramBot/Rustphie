@@ -933,15 +933,21 @@ dependencies = [
  "log",
  "pretty_env_logger",
  "regex",
+ "rustphie-helpers",
  "rustphie-macros",
  "teloxide",
  "tokio",
 ]
 
 [[package]]
+name = "rustphie-helpers"
+version = "0.1.0"
+
+[[package]]
 name = "rustphie-macros"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "proc-macro2",
  "quote",
  "syn",

@@ -14,3 +14,4 @@ pretty_env_logger = "0"
 regex = "1"
 
 rustphie-macros = { path = "../rustphie-macros" }
+rustphie-helpers = { path = "../rustphie-helpers" }

@@ -1,4 +1,4 @@
-use syn::{FieldsNamed, Type};
+use syn::{FieldsNamed, Type, PathArguments};
 use quote::ToTokens;
 
 pub fn impl_parse_args_named(
@@ -20,6 +20,7 @@ fn create_parser<'a>(
     count_args: usize,
     regex: String,
 ) -> proc_macro2::TokenStream {
+    let types = extract_type(types);
     let inner2 = quote::quote! {
         // TODO: Remove this unwrap
         #(#types::from_str(captures_iter.next().unwrap().ok_or(ParseError::TooFewArguments {
@@ -80,4 +81,34 @@ fn create_parser<'a>(
     quote::quote! {
         let arguments = #function_to_parse(args)?;
     }
+}
+
+fn extract_type<'a>(types: impl Iterator<Item = &'a Type>) -> Vec<proc_macro2::TokenStream> {
+    let mut extracted_ty = Vec::new();
+    for ty in types {
+        let __extracted = match ty {
+            Type::Path(type_path) if type_path.qself.is_none() && type_path.path.leading_colon.is_none() => {
+                // complexity! We only support single type param, if you really need more, DIY
+                let mut type_params_iter = type_path.path.segments.iter();
+                if type_params_iter.len() > 1 {
+                    type_path.to_token_stream()
+                } else {
+                    // we are sure its not `None` value from above assertion
+                    let path = type_params_iter.next().unwrap();
+                    match &path.arguments {
+                        PathArguments::AngleBracketed(type_) => {
+                            let ident = &path.ident;
+                            quote::quote! {
+                                #ident::#type_
+                            }
+                        }
+                        rest => rest.to_token_stream()
+                    }
+                }
+            }
+            rest => rest.to_token_stream(),
+        };
+        extracted_ty.push(__extracted);
+    }
+    extracted_ty
 }

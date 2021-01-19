@@ -3,7 +3,6 @@ use teloxide::Bot;
 use config::Configuration;
 
 mod modules;
-pub mod utils;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

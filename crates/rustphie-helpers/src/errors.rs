@@ -6,6 +6,7 @@ type Regex = String;
 type CommandArguments = String;
 
 #[derive(Debug)]
+/// Errors occurred when parsing command arguments
 pub enum ParseError {
     TooFewArguments {
         expected: usize,

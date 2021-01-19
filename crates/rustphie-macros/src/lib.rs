@@ -48,14 +48,15 @@ pub fn derive_command(tokens: TokenStream) -> TokenStream {
         let parser = impl_parse_args_named(fields, quote! { Self }, command.regex.clone().unwrap());
         let fn_parse = impl_parse(command, parser);
 
-        // eprintln!("TOKENS: {}", fn_parse.clone());
-        TokenStream::from(
+        let res = TokenStream::from(
             quote! {
-                impl crate::utils::Command for #ident {
+                impl rustphie_helpers::Command for #ident {
                     #fn_parse
                 }
             }
-        )
+        );
+        // eprintln!("{}", res.clone());
+        res
     } else {
         TokenStream::from(
             quote! { compile_error("Only named structs are supported right now!")}
@@ -78,9 +79,9 @@ fn impl_parse(info: CommandData, parser: proc_macro2::TokenStream) -> proc_macro
     let command = info.get_command();
 
     quote! {
-        fn parse<N: Into<String>>(s: &str, bot_username: N) -> Result<Self, crate::utils::ParseError> {
+        fn parse<N: Into<String>>(s: &str, bot_username: N) -> Result<Self, rustphie_helpers::ParseError> {
             use std::str::FromStr;
-            use crate::utils::ParseError;
+            use rustphie_helpers::ParseError;
 
             let mut words = s.splitn(2, ' ');
             let mut splited = words.next().expect("First item will be command").split('@');
