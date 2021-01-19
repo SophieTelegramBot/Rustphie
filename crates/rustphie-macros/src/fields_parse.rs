@@ -20,14 +20,14 @@ fn create_parser<'a>(
     count_args: usize,
     regex: String,
 ) -> proc_macro2::TokenStream {
+    let i = 0..count_args;
     let types = extract_type(types);
     let inner2 = quote::quote! {
         // TODO: Remove this unwrap
         #(#types::from_str(captures_iter.next().unwrap().ok_or(ParseError::TooFewArguments {
             expected: #count_args,
-            found: 0,
-            // TODO: replace 0
-            message: format!("Expected but not found arg number {}", 0),
+            found: #i,
+            message: format!("Expected but not found arg number {}", #i),
         })?.as_str()).map_err(|e|/*ParseError::IncorrectFormat({ let e: Box<dyn std::error::Error + Send + Sync + 'static> = e.into(); e })*/ {
             let e: Box<dyn std::error::Error + Send + Sync + 'static> = e.into();
             ParseError::IncorrectFormat(e)
@@ -41,8 +41,7 @@ fn create_parser<'a>(
             };
             let captures = match REGEX.captures(s.as_str()) {
                 None => {
-                    // TODO: show regex in log
-                    log::warn!("No captures found, regex: {{todo}} string: {}", s);
+                    log::warn!("No captures found, regex: {} string: {}", #regex, s);
                     return Err(ParseError::NoCapturesFound(#regex.into(), s));
                 },
                 Some(val) => {
@@ -51,14 +50,14 @@ fn create_parser<'a>(
                         std::cmp::Ordering::Less => {
                             return Err(ParseError::TooFewArguments {
                                 expected: #count_args,
-                                found: 0, // not implemented, todo
-                                message: format!("Expected but not found arg number {}", 0 + 1), // not implemented, todo
+                                found: actual_len,
+                                message: format!("Expected but not found arg number {}", actual_len),
                             });
                         },
                         std::cmp::Ordering::Greater => {
                             return Err(ParseError::TooManyArguments {
                                 expected: #count_args,
-                                found: #count_args + 1,
+                                found: actual_len,
                                 message: format!("Excess arguments"),
                             });
                         },
