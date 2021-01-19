@@ -3,6 +3,11 @@ use std::ops::{Deref, DerefMut};
 
 #[derive(Debug)]
 /// Type used in optional command arg
+///
+/// # Description
+/// Deref / DerefMut allows you to access methods of wrapped `Option`. learn more [Deref]
+///
+/// [Deref]: std::ops::Deref
 pub struct OptionArg<Type: FromStr>(Option<Type>);
 
 impl<Type: FromStr> Deref for OptionArg<Type> {
