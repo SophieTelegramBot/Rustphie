@@ -1,17 +1,46 @@
-use syn::{FieldsNamed, Type, PathArguments};
+use syn::{FieldsNamed, Type, PathArguments, FieldsUnnamed};
 use quote::ToTokens;
 
 pub fn impl_parse_args_named(
     data: &FieldsNamed,
-    variant: impl ToTokens,
-    regex: String,
+    regex: Option<String>,
 ) -> proc_macro2::TokenStream {
-    let get_arguments = create_parser(data.named.iter().map(|f| &f.ty), data.named.len(), regex);
-    let i = (0..data.named.len()).map(syn::Index::from);
-    let name = data.named.iter().map(|f| f.ident.as_ref().unwrap());
+    if data.named.is_empty() {
+        quote::quote! {
+            Self {}
+        }
+    } else {
+        let get_arguments = create_parser(data.named.iter().map(|f| &f.ty), data.named.len(), regex.unwrap());
+        let i = (0..data.named.len()).map(syn::Index::from);
+        let name = data.named.iter().map(|f| f.ident.as_ref().unwrap());
+        quote::quote! {
+            #get_arguments
+            Self { #(#name: arguments.#i),* }
+        }
+    }
+}
+
+pub fn impl_parse_args_unnamed(
+    data: &FieldsUnnamed,
+    regex: Option<String>,
+) -> proc_macro2::TokenStream {
+    if data.unnamed.is_empty() {
+        quote::quote! {
+            Self()
+        }
+    } else {
+        let get_arguments = create_parser(data.unnamed.iter().map(|f| &f.ty), data.unnamed.len(), regex.unwrap());
+        let i = (0..data.unnamed.len()).map(syn::Index::from);
+        quote::quote! {
+            #get_arguments
+            Self(#(arguments.#i),*)
+        }
+    }
+}
+
+pub fn impl_parse_args_unit() -> proc_macro2::TokenStream {
     quote::quote! {
-        #get_arguments
-        #variant { #(#name: arguments.#i),* }
+        Self
     }
 }
 

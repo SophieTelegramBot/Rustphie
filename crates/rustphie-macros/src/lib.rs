@@ -9,7 +9,7 @@ use syn::{DeriveInput, Fields, parse_macro_input};
 
 use crate::attr::{Attr, VecAttrs};
 use crate::command::CommandData;
-use crate::fields_parse::impl_parse_args_named;
+use crate::fields_parse::{impl_parse_args_named, impl_parse_args_unnamed, impl_parse_args_unit};
 
 mod attr;
 mod command;
@@ -40,28 +40,33 @@ pub fn derive_command(tokens: TokenStream) -> TokenStream {
         Ok(val) => val,
         Err(e) => return TokenStream::from(quote! {compile_error!(#e)}),
     };
-    if let Fields::Named(fields) = &struct_data.fields {
-        let ident = &input.ident;
-        if command.regex.is_none() {
-            return TokenStream::from(quote! { compile_error!("Found empty regex field in named struct") });
-        }
-        let parser = impl_parse_args_named(fields, quote! { Self }, command.regex.clone().unwrap());
-        let fn_parse = impl_parse(command, parser);
 
-        let res = TokenStream::from(
-            quote! {
+    let ident = &input.ident;
+    let parser = match &struct_data.fields {
+        Fields::Named(data) => {
+            if !data.named.is_empty() && command.regex.is_none() {
+                return TokenStream::from(quote! { compile_error!("Found empty regex field") });
+            }
+            impl_parse_args_named(data, command.regex.clone())
+        }
+        Fields::Unnamed(data) => {
+            if !data.unnamed.is_empty() && command.regex.is_none() {
+                return TokenStream::from(quote! { compile_error!("Found empty regex field") });
+            }
+            impl_parse_args_unnamed(data, command.regex.clone())
+        }
+        Fields::Unit => impl_parse_args_unit()
+    };
+    let fn_parse = impl_parse(command, parser);
+    let res = TokenStream::from(
+        quote! {
                 impl rustphie_helpers::Command for #ident {
                     #fn_parse
                 }
             }
-        );
-        // eprintln!("{}", res.clone());
-        res
-    } else {
-        TokenStream::from(
-            quote! { compile_error("Only named structs are supported right now!")}
-        )
-    }
+    );
+    // eprintln!("{}", res.clone());
+    res
 }
 
 fn parse_attributes(input: &[syn::Attribute]) -> Result<Vec<Attr>, TokenStream> {
