@@ -1,13 +1,14 @@
 /// Tests proc macro `Command`
 
+#[cfg(test)]
 mod tests {
     use rustphie_macros::*;
     use rustphie_helpers::*;
 
     #[test]
     fn test_basic() {
-        #[Command]
-        #[command(command = "test", regex = ".*")]
+        #[derive(Command)]
+        #[command(command = "test", regex = "(.*)")]
         struct Command {
             arg: String,
         }
@@ -18,7 +19,7 @@ mod tests {
 
     #[test]
     fn test_option_none_arg() {
-        #[Command]
+        #[derive(Command)]
         #[command(command = "test", regex = "(meow|)")]
         struct Command {
             arg: OptionArg<String>
@@ -30,14 +31,14 @@ mod tests {
 
     #[test]
     fn test_option_some_arg() {
-        #[Command]
+        #[derive(Command)]
         #[command(command = "test", regex = "(meow|)")]
         struct Command {
             arg: OptionArg<String>
         }
         let res: Result<Command, ParseError> = Command::parse("/test meow", "");
         assert!(res.is_ok());
-        assert_eq!(res.unwrap().arg, "meow");
+        assert_eq!(res.unwrap().arg.as_ref().unwrap(), &"meow".to_string());
     }
 
     // TODO: test failure cases
