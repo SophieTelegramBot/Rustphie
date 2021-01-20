@@ -5,15 +5,18 @@ extern crate syn;
 use proc_macro::TokenStream;
 
 use quote::quote;
-use syn::{DeriveInput, Fields, parse_macro_input};
+use syn::{Data, DataStruct, DeriveInput, Error, Fields, parse_macro_input, Result as SynResult, spanned::Spanned};
 
 use crate::attr::{Attr, VecAttrs};
 use crate::command::CommandData;
-use crate::fields_parse::{impl_parse_args_named, impl_parse_args_unnamed, impl_parse_args_unit};
+use crate::errors::BasicErrors;
+use crate::fields_parse::{impl_parse_args_named, impl_parse_args_unit, impl_parse_args_unnamed};
 
 mod attr;
 mod command;
 mod fields_parse;
+mod parsers;
+mod errors;
 
 macro_rules! get_or_return {
     ($($some:tt)*) => {
@@ -27,19 +30,9 @@ macro_rules! get_or_return {
 #[proc_macro_derive(Command, attributes(command))]
 pub fn derive_command(tokens: TokenStream) -> TokenStream {
     let input = parse_macro_input!(tokens as DeriveInput);
-    let struct_data = {
-        if let syn::Data::Struct(data) = &input.data {
-            data
-        } else {
-            let error = "Commands can be used only on structs";
-            return TokenStream::from(quote! {compile_error!(#error)});
-        }
-    };
-    let attrs = get_or_return!(parse_attributes(&input.attrs));
-    let command = match CommandData::try_from(attrs.as_slice()) {
-        Ok(val) => val,
-        Err(e) => return TokenStream::from(quote! {compile_error!(#e)}),
-    };
+    let struct_data = get_or_return!(parse_struct(&input.data).map_err(|e| e.compile_error()));
+    let attrs = get_or_return!(parse_attributes(&input.attrs).map_err(|e| e.to_compile_error().into()));
+    let command = get_or_return!(CommandData::try_from(&attrs.as_slice()).map_err(|e| TokenStream::from(Error::new(input.span(), format!("{}", e)).to_compile_error())));
 
     let ident = &input.ident;
     let parser = match &struct_data.fields {
@@ -69,15 +62,20 @@ pub fn derive_command(tokens: TokenStream) -> TokenStream {
     res
 }
 
-fn parse_attributes(input: &[syn::Attribute]) -> Result<Vec<Attr>, TokenStream> {
+fn parse_attributes(input: &[syn::Attribute]) -> SynResult<Vec<Attr>> {
     let mut struct_attrs = Vec::new();
     for attr in input.iter() {
-        match attr.parse_args::<VecAttrs>() {
-            Ok(mut attrs_) => struct_attrs.append(attrs_.data.as_mut()),
-            Err(e) => return Err(TokenStream::from(e.to_compile_error()))
-        }
+        struct_attrs.append(&mut attr.parse_args::<VecAttrs>()?.data)
     };
     Ok(struct_attrs)
+}
+
+fn parse_struct(input: &Data) -> Result<DataStruct, BasicErrors> {
+    if let Data::Struct(data) = input {
+        Ok(data.clone())
+    } else {
+        Err(BasicErrors::CanBeUsedOnlyInStruct)
+    }
 }
 
 fn impl_parse(info: CommandData, parser: proc_macro2::TokenStream) -> proc_macro2::TokenStream {

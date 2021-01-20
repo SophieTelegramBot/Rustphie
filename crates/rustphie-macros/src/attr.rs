@@ -1,8 +1,9 @@
 use syn::{LitStr, Token};
-use syn::parse::{ParseBuffer, Parse};
+use syn::parse::{Parse, ParseBuffer};
 
 pub enum CommandAttributes {
     Regex,
+    Parser,
     Command
 }
 
