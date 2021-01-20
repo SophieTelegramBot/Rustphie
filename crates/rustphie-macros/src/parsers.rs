@@ -13,7 +13,7 @@ impl ParserType {
     pub(crate) fn try_from(s: &str, delim: Option<String>) -> Result<Self, ParserTypeErrors> {
         match s.to_ascii_lowercase().as_str() {
             "regex" | "re" => Ok(ParserType::Regex),
-            "split" => Ok(ParserType::Split(delim.unwrap_or(DEFAULT_SPLIT_DELIMITER.into()).into())),
+            "split" => Ok(ParserType::Split(delim.unwrap_or_else(|| DEFAULT_SPLIT_DELIMITER.into()))),
             _ => Err(ParserTypeErrors::UnknownParserType)
         }
     }

@@ -66,7 +66,7 @@ pub(crate) fn parse_attrs(attrs: &[Attr]) -> Result<CommandAttrs, CommandsError>
     } else {
         ParserType::try_from("regex", None)
     }
-        .map_err(|e| CommandsError::ParseError(e))?;
+        .map_err(CommandsError::ParseError)?;
 
     Ok(CommandAttrs {
         regex,
