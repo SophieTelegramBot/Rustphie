@@ -55,18 +55,19 @@ fn create_parser<'a>(
         ParserType::Regex => {
             // there's already a assertion done in lower levels to make sure regex field exists when parser is selected
             let regex = command_data.regex.clone().unwrap();
-            let function_to_parse = create_regex_parser(types, count_args, regex);
+            let function_to_parse = create_regex_parser(types, count_args, regex, ParserType::Regex);
             parse_caller(function_to_parse)
         }
         ParserType::Split(delimiter) => {
-            let function_to_parse = create_split_parser(types, count_args, delimiter);
+            // parser creator doesnt really need data about delimiter.
+            let function_to_parse = create_split_parser(types, count_args, delimiter, ParserType::Split(Default::default()));
             parse_caller(function_to_parse)
         }
     }
 }
 
-fn create_split_parser<'a>(types: impl Iterator<Item = &'a Type>, count_args: usize, delimiter: String) -> proc_macro2::TokenStream {
-    let deserializer = de_generator(types, count_args);
+fn create_split_parser<'a>(types: impl Iterator<Item = &'a Type>, count_args: usize, delimiter: String, parser_type: ParserType) -> proc_macro2::TokenStream {
+    let deserializer = de_generator(types, count_args, parser_type);
     quote::quote! {
         (|s: String| {
             let mut splitted = s.split(#delimiter)
@@ -83,8 +84,8 @@ fn create_split_parser<'a>(types: impl Iterator<Item = &'a Type>, count_args: us
     }
 }
 
-fn create_regex_parser<'a>(types: impl Iterator<Item = &'a Type>, count_args: usize, regex: String,) -> proc_macro2::TokenStream {
-    let deserializers = de_generator(types, count_args);
+fn create_regex_parser<'a>(types: impl Iterator<Item = &'a Type>, count_args: usize, regex: String, parser_type: ParserType) -> proc_macro2::TokenStream {
+    let deserializers = de_generator(types, count_args, parser_type);
     quote::quote! {
         (|s: String| {
             lazy_static::lazy_static! {
@@ -160,13 +161,23 @@ fn extract_type<'a>(types: impl Iterator<Item = &'a Type>) -> Vec<proc_macro2::T
     extracted_ty
 }
 
-fn de_generator<'a>(types: impl Iterator<Item = &'a Type>, count_args: usize) -> proc_macro2::TokenStream {
+fn de_generator<'a>(types: impl Iterator<Item = &'a Type>, count_args: usize, parser_type: ParserType) -> proc_macro2::TokenStream {
     let i = 0..count_args;
     let types = extract_type(types);
 
+    let inner = match parser_type {
+        ParserType::Regex => quote::quote! {
+            // TODO: Remove this unwrap
+            captures_iter.next().unwrap()
+        },
+        ParserType::Split(_) => quote::quote! {
+            splitted.next()
+        }
+    };
+
     quote::quote! {
         // TODO: Remove this unwrap
-        #(#types::from_str(captures_iter.next().unwrap().ok_or(ParseError::TooFewArguments {
+        #(#types::from_str(#inner.ok_or(ParseError::TooFewArguments {
             expected: #count_args,
             found: #i,
             message: format!("Expected but not found arg number {}", #i),
