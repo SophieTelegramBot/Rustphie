@@ -40,13 +40,13 @@ pub fn derive_command(tokens: TokenStream) -> TokenStream {
             if !data.named.is_empty() && command.regex.is_none() {
                 return TokenStream::from(quote! { compile_error!("Found empty regex field") });
             }
-            impl_parse_args_named(data, command.regex.clone())
+            impl_parse_args_named(data, &command)
         }
         Fields::Unnamed(data) => {
             if !data.unnamed.is_empty() && command.regex.is_none() {
                 return TokenStream::from(quote! { compile_error!("Found empty regex field") });
             }
-            impl_parse_args_unnamed(data, command.regex.clone())
+            impl_parse_args_unnamed(data, &command)
         }
         Fields::Unit => impl_parse_args_unit()
     };

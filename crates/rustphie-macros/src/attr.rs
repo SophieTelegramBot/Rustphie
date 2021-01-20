@@ -4,7 +4,8 @@ use syn::parse::{Parse, ParseBuffer};
 pub enum CommandAttributes {
     Regex,
     Parser,
-    Command
+    Command,
+    Separator,
 }
 
 impl Parse for CommandAttributes {
@@ -13,6 +14,8 @@ impl Parse for CommandAttributes {
         match argument.to_string().as_str() {
             "regex" => Ok(Self::Regex),
             "command" => Ok(Self::Command),
+            "parser" => Ok(Self::Parser),
+            "separator" | "sep" | "delim" => Ok(Self::Separator),
             _ => Err(input.error("Unexpected argument")),
         }
     }
