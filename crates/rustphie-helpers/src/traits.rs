@@ -10,3 +10,8 @@ pub trait Command: Sized {
     /// `bot_username`: username of the bot, used to extract "mentioned" command, we dont intercept the command given to another bot
     fn parse<BotUsername: Into<String>>(s: &str, bot_username: BotUsername) -> Result<Self, ParseError>;
 }
+
+/// Trait implementation used for parsing of callback query data
+pub trait CallbackQuery: Sized {
+    fn parse(data: String) -> Result<Self, ParseError>;
+}

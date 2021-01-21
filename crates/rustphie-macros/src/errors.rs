@@ -46,15 +46,32 @@ impl Error for BasicErrors {}
 
 #[derive(Debug)]
 pub(crate) enum ParserTypeErrors {
-    UnknownParserType
+    UnknownParserType,
+    CantFindRequiredData(String),
 }
 
 impl Error for ParserTypeErrors {}
 
 impl Display for ParserTypeErrors {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        match *self {
-            Self::UnknownParserType => write!(f, "Unknown parser type")
+        match self {
+            Self::UnknownParserType => write!(f, "Unknown parser type"),
+            Self::CantFindRequiredData(t) => write!(f, "Can't find required data `{}`", t)
         }
     }
 }
+
+#[derive(Debug)]
+pub enum CallbackDeriveErrors {
+    NoPrefixGiven
+}
+
+impl Display for CallbackDeriveErrors {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        match *self {
+            Self::NoPrefixGiven => write!(f, "No prefix were given!")
+        }
+    }
+}
+
+impl Error for CallbackDeriveErrors {}

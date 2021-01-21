@@ -4,19 +4,23 @@ extern crate syn;
 
 use proc_macro::TokenStream;
 
+use proc_macro2::{Ident, Span};
 use quote::quote;
-use syn::{Data, DataStruct, DeriveInput, Error, Fields, parse_macro_input, Result as SynResult, spanned::Spanned};
+use syn::{Data, DataStruct, DeriveInput, Error, Fields, parse_macro_input, Result as SynResult, spanned::Spanned, Type};
 
-use crate::attr::{Attr, VecAttrs};
+use crate::attr::{Attr, CallbackQueryAttributes, CommandAttributes, VecAttrs};
+use crate::callbackquery::CallbackDeriveData;
 use crate::command::CommandData;
 use crate::errors::BasicErrors;
 use crate::fields_parse::{impl_parse_args_named, impl_parse_args_unit, impl_parse_args_unnamed};
+use crate::parsers::ParserPayloadData;
 
 mod attr;
 mod command;
 mod fields_parse;
 mod parsers;
 mod errors;
+mod callbackquery;
 
 macro_rules! get_or_return {
     ($($some:tt)*) => {
@@ -27,29 +31,38 @@ macro_rules! get_or_return {
     }
 }
 
+#[proc_macro_derive(CallbackQuery, attributes(callback_query))]
+pub fn derive_callbackquery(tokens: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(tokens as DeriveInput);
+    let struct_data = get_or_return!(parse_struct(&input.data).map_err(|e| e.compile_error()));
+    let attrs = get_or_return!(parse_attributes_callbackquery(&input.attrs).map_err(|e| TokenStream::from(Error::new(input.span(), e).to_compile_error())));
+    let cb_data = get_or_return!(CallbackDeriveData::try_from(attrs.as_slice()).map_err(|e| TokenStream::from(Error::new(input.span(), e).to_compile_error())));
+
+    let ident = &input.ident;
+    let parser = generate_field_parsers(&struct_data.fields, cb_data.clone());
+    let fn_parser = impl_parse_callbackquery(cb_data.clone(), parser);
+    let new_fn = impl_callbackquery_derive_new_fn(&struct_data.fields, cb_data, ident.clone());
+    let res = TokenStream::from(
+        quote! {
+            #new_fn
+            impl rustphie_helpers::CallbackQuery for #ident {
+                #fn_parser
+            }
+        }
+    );
+    // eprintln!("{}", res);
+    res
+}
+
 #[proc_macro_derive(Command, attributes(command))]
 pub fn derive_command(tokens: TokenStream) -> TokenStream {
     let input = parse_macro_input!(tokens as DeriveInput);
     let struct_data = get_or_return!(parse_struct(&input.data).map_err(|e| e.compile_error()));
-    let attrs = get_or_return!(parse_attributes(&input.attrs).map_err(|e| e.to_compile_error().into()));
-    let command = get_or_return!(CommandData::try_from(&attrs.as_slice()).map_err(|e| TokenStream::from(Error::new(input.span(), format!("{}", e)).to_compile_error())));
+    let attrs = get_or_return!(parse_attributes_command(&input.attrs).map_err(|e| e.to_compile_error().into()));
+    let command = get_or_return!(CommandData::try_from(&attrs.as_slice()).map_err(|e| TokenStream::from(Error::new(input.span(), e).to_compile_error())));
 
     let ident = &input.ident;
-    let parser = match &struct_data.fields {
-        Fields::Named(data) => {
-            if !data.named.is_empty() && command.regex.is_none() {
-                return TokenStream::from(quote! { compile_error!("Found empty regex field") });
-            }
-            impl_parse_args_named(data, &command)
-        }
-        Fields::Unnamed(data) => {
-            if !data.unnamed.is_empty() && command.regex.is_none() {
-                return TokenStream::from(quote! { compile_error!("Found empty regex field") });
-            }
-            impl_parse_args_unnamed(data, &command)
-        }
-        Fields::Unit => impl_parse_args_unit()
-    };
+    let parser = generate_field_parsers(&struct_data.fields, command.clone());
     let fn_parse = impl_parse(command, parser);
     let res = TokenStream::from(
         quote! {
@@ -58,16 +71,32 @@ pub fn derive_command(tokens: TokenStream) -> TokenStream {
                 }
             }
     );
-    // eprintln!("{}", res.clone());
+    // eprintln!("{}", res);
     res
 }
 
-fn parse_attributes(input: &[syn::Attribute]) -> SynResult<Vec<Attr>> {
+fn generate_field_parsers<T: Into<ParserPayloadData>>(field_type: &Fields, data: T) -> proc_macro2::TokenStream {
+    match field_type {
+        Fields::Named(field_data) => impl_parse_args_named(field_data, data.into()),
+        Fields::Unnamed(field_data) => impl_parse_args_unnamed(field_data, data.into()),
+        Fields::Unit => impl_parse_args_unit(),
+    }
+}
+
+fn parse_attributes_command(input: &[syn::Attribute]) -> SynResult<Vec<Attr<CommandAttributes>>> {
     let mut struct_attrs = Vec::new();
     for attr in input.iter() {
-        struct_attrs.append(&mut attr.parse_args::<VecAttrs>()?.data)
+        struct_attrs.append(&mut attr.parse_args::<VecAttrs<CommandAttributes>>()?.data)
     };
     Ok(struct_attrs)
+}
+
+fn parse_attributes_callbackquery(input: &[syn::Attribute]) -> SynResult<Vec<Attr<CallbackQueryAttributes>>> {
+    let mut attributes = Vec::new();
+    for attr in input.iter() {
+        attributes.append(&mut attr.parse_args::<VecAttrs<CallbackQueryAttributes>>()?.data)
+    }
+    Ok(attributes)
 }
 
 fn parse_struct(input: &Data) -> Result<DataStruct, BasicErrors> {
@@ -77,6 +106,8 @@ fn parse_struct(input: &Data) -> Result<DataStruct, BasicErrors> {
         Err(BasicErrors::CanBeUsedOnlyInStruct)
     }
 }
+
+// TODO: Move below helpers to another mod
 
 fn impl_parse(info: CommandData, parser: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
     let command = info.get_command();
@@ -100,6 +131,56 @@ fn impl_parse(info: CommandData, parser: proc_macro2::TokenStream) -> proc_macro
                 #command => Ok({ #parser }),
                 _ => Err(ParseError::UnknownCommand(command_raw.to_string())),
             }
+        }
+    }
+}
+
+fn impl_parse_callbackquery(info: CallbackDeriveData, parser: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+    let prefix = info.prefix + "_";
+    quote! {
+        fn parse(data: String) -> Result<Self, rustphie_helpers::ParseError> {
+            use std::str::FromStr;
+            use rustphie_helpers::ParseError;
+
+            let args = if data.starts_with(#prefix) {
+                data.trim_start_matches(#prefix).to_string()
+            } else {
+                return Err(ParseError::UnknownCommand(#prefix.into()));
+            };
+            Ok({ #parser })
+        }
+    }
+}
+
+fn impl_callbackquery_derive_new_fn(fields: &Fields, data: CallbackDeriveData, ident: proc_macro2::Ident) -> proc_macro2::TokenStream {
+    let prefix = data.prefix;
+    let inner_function = match fields {
+        Fields::Named(data) => {
+            let ident = data.named.iter().map(|f| f.ident.clone().unwrap() /* we are sure its not tuple struct*/).collect::<Vec<Ident>>();
+            let types = data.named.iter().map(|f| f.ty.clone()).collect::<Vec<Type>>();
+            // let test: Vec<String> = Vec::from_iter(ident);
+            // let test2 = Vec::from_iter(data.named.iter().map(|f| f.ty).collect());
+            bare_func_gen(ident, types, prefix)
+        }
+        Fields::Unnamed(data) => {
+            let types = data.unnamed.iter().map(|f| f.ty.clone()).collect::<Vec<Type>>();
+            let ident = (0usize..data.unnamed.len()).map(|f| { let var = format!("__var{}", f); Ident::new(var.as_str(), Span::call_site()) }).collect::<Vec<Ident>>();
+            bare_func_gen(ident, types, prefix)
+        }
+        Fields::Unit => quote! { fn new() -> String { #prefix.into() } }
+    };
+    quote! {
+        impl #ident {
+            #inner_function
+        }
+    }
+}
+
+fn bare_func_gen(ident: Vec<Ident>, types: Vec<Type>, prefix: String) -> proc_macro2::TokenStream {
+    quote! {
+        fn new(#(#ident: #types),*) -> String {
+            let data = vec![#prefix.to_string(), #(#ident.to_string()),*];
+            data.join("_".into())
         }
     }
 }

@@ -1,11 +1,11 @@
 use syn::{FieldsNamed, Type, PathArguments, FieldsUnnamed};
 use quote::ToTokens;
-use crate::command::CommandData;
-use crate::parsers::ParserType;
 
-pub fn impl_parse_args_named(
+use crate::parsers::{ParserType, ParserPayloadData};
+
+pub(crate) fn impl_parse_args_named(
     data: &FieldsNamed,
-    command_data: &CommandData
+    command_data: ParserPayloadData
 ) -> proc_macro2::TokenStream {
     if data.named.is_empty() {
         quote::quote! {
@@ -22,9 +22,9 @@ pub fn impl_parse_args_named(
     }
 }
 
-pub fn impl_parse_args_unnamed(
+pub(crate) fn impl_parse_args_unnamed(
     data: &FieldsUnnamed,
-    command_data: &CommandData
+    command_data: ParserPayloadData
 ) -> proc_macro2::TokenStream {
     if data.unnamed.is_empty() {
         quote::quote! {
@@ -49,13 +49,12 @@ pub fn impl_parse_args_unit() -> proc_macro2::TokenStream {
 fn create_parser<'a>(
     types: impl Iterator<Item = &'a Type>,
     count_args: usize,
-    command_data: &CommandData
+    data: ParserPayloadData
 ) -> proc_macro2::TokenStream {
-    match command_data.clone().parser_type {
-        ParserType::Regex => {
+    match data.parser_type {
+        ParserType::Regex(regex) => {
             // there's already a assertion done in lower levels to make sure regex field exists when parser is selected
-            let regex = command_data.regex.clone().unwrap();
-            let function_to_parse = create_regex_parser(types, count_args, regex, ParserType::Regex);
+            let function_to_parse = create_regex_parser(types, count_args, regex, ParserType::Regex(Default::default()));
             parse_caller(function_to_parse)
         }
         ParserType::Split(delimiter) => {
@@ -70,7 +69,7 @@ fn create_split_parser<'a>(types: impl Iterator<Item = &'a Type>, count_args: us
     let deserializer = de_generator(types, count_args, parser_type);
     quote::quote! {
         (|s: String| {
-            let mut splitted = s.split(#delimiter)
+            let mut splitted = s.split(#delimiter);
             let res = (#deserializer);
             match splitted.next() {
                 Some(d) => Err(ParseError::TooManyArguments {
@@ -165,23 +164,22 @@ fn de_generator<'a>(types: impl Iterator<Item = &'a Type>, count_args: usize, pa
     let i = 0..count_args;
     let types = extract_type(types);
 
-    let inner = match parser_type {
-        ParserType::Regex => quote::quote! {
+    let (inner, inner2) = match parser_type {
+        ParserType::Regex(_) => (quote::quote! {
             // TODO: Remove this unwrap
             captures_iter.next().unwrap()
-        },
-        ParserType::Split(_) => quote::quote! {
+        }, quote::quote! {.as_str()}),
+        ParserType::Split(_) => (quote::quote! {
             splitted.next()
-        }
+        }, quote::quote! {})
     };
 
     quote::quote! {
-        // TODO: Remove this unwrap
         #(#types::from_str(#inner.ok_or(ParseError::TooFewArguments {
             expected: #count_args,
             found: #i,
             message: format!("Expected but not found arg number {}", #i),
-        })?.as_str()).map_err(|e|/*ParseError::IncorrectFormat({ let e: Box<dyn std::error::Error + Send + Sync + 'static> = e.into(); e })*/ {
+        })?#inner2).map_err(|e|/*ParseError::IncorrectFormat({ let e: Box<dyn std::error::Error + Send + Sync + 'static> = e.into(); e })*/ {
             let e: Box<dyn std::error::Error + Send + Sync + 'static> = e.into();
             ParseError::IncorrectFormat(e)
         })?,)*

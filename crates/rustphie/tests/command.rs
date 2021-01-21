@@ -1,11 +1,11 @@
 /// Tests proc macro `Command`
 
 #[cfg(test)]
-mod tests {
-    use rustphie_macros::*;
+mod command_parser_tests {
     use rustphie_helpers::*;
+    use rustphie_macros::*;
 
-    #[test]
+     #[test]
     fn test_basic() {
         #[derive(Command)]
         #[command(command = "test", regex = "(.*)")]

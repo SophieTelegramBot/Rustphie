@@ -4,4 +4,4 @@ mod errors;
 mod traits;
 mod types;
 
-pub use {errors::ParseError, traits::Command, types::OptionArg};
+pub use {errors::ParseError, traits::{Command, CallbackQuery}, types::OptionArg};
