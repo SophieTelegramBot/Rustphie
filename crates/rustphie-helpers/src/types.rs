@@ -8,7 +8,7 @@ use std::ops::{Deref, DerefMut};
 /// Deref / DerefMut allows you to access methods of wrapped `Option`. learn more [Deref]
 ///
 /// [Deref]: std::ops::Deref
-pub struct OptionArg<Type: FromStr>(Option<Type>);
+pub struct OptionArg<Type: FromStr>(pub Option<Type>);
 
 impl<Type: FromStr> Deref for OptionArg<Type> {
     type Target = Option<Type>;
@@ -36,6 +36,15 @@ where
         } else {
             let converted = Type::from_str(s)?;
             Ok(OptionArg(Some(converted)))
+        }
+    }
+}
+
+impl <Type: ToString + FromStr> ToString for OptionArg<Type> {
+    fn to_string(&self) -> String {
+        match &self.0 {
+            Some(t) => t.to_string(),
+            None => "".into()
         }
     }
 }
