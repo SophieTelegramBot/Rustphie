@@ -1,8 +1,8 @@
 
 #[cfg(test)]
 mod callback_data_parser {
-    use rustphie_macros::*;
     use rustphie_helpers::*;
+    use rustphie_macros::*;
 
     #[test]
     fn basic_test() {
@@ -55,5 +55,15 @@ mod callback_data_parser {
 
         let res = Test::parse("test_some".into()).unwrap();
         assert_eq!(res.optional.as_ref().unwrap(), "some");
+    }
+
+    #[test]
+    fn prefix_fail_test() {
+        #[derive(CallbackQuery)]
+        #[callback_query(prefix = "test")]
+        struct Test;
+
+        let res = Test::parse("notTest".into());
+        assert!(res.is_err());
     }
 }

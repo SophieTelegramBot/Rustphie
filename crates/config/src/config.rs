@@ -4,7 +4,7 @@ use serde::Deserialize;
 /// Contains bot configurations
 ///
 /// # Example
-/// ```
+/// ```ignore
 /// # use config::Configuration;
 /// # use std::env::set_var;
 /// # fn main() {
@@ -27,19 +27,5 @@ impl Configuration {
     pub fn load_config() -> Result<Self> {
         let config = prefixed("BOT_").from_env::<Configuration>()?;
         Ok(config)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use envy::Result;
-    use crate::Configuration;
-
-    #[test]
-    fn load_config_test() -> Result<()> {
-        let token = "123";
-        std::env::set_var("BOT_TOKEN", token.clone());
-        let config = Configuration::load_config()?;
-        Ok(assert_eq!(config.token, token.to_string()))
     }
 }

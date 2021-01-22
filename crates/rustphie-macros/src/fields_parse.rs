@@ -1,18 +1,18 @@
-use syn::{FieldsNamed, Type, PathArguments, FieldsUnnamed};
 use quote::ToTokens;
+use syn::{FieldsNamed, FieldsUnnamed, PathArguments, Type};
 
-use crate::parsers::{ParserType, ParserPayloadData};
+use crate::parsers::ParserType;
 
 pub(crate) fn impl_parse_args_named(
     data: &FieldsNamed,
-    command_data: ParserPayloadData
+    parser_type: ParserType
 ) -> proc_macro2::TokenStream {
     if data.named.is_empty() {
         quote::quote! {
             Self {}
         }
     } else {
-        let get_arguments = create_parser(data.named.iter().map(|f| &f.ty), data.named.len(), command_data);
+        let get_arguments = create_parser(data.named.iter().map(|f| &f.ty), data.named.len(), parser_type);
         let i = (0..data.named.len()).map(syn::Index::from);
         let name = data.named.iter().map(|f| f.ident.as_ref().unwrap());
         quote::quote! {
@@ -24,14 +24,14 @@ pub(crate) fn impl_parse_args_named(
 
 pub(crate) fn impl_parse_args_unnamed(
     data: &FieldsUnnamed,
-    command_data: ParserPayloadData
+    parser_type: ParserType
 ) -> proc_macro2::TokenStream {
     if data.unnamed.is_empty() {
         quote::quote! {
             Self()
         }
     } else {
-        let get_arguments = create_parser(data.unnamed.iter().map(|f| &f.ty), data.unnamed.len(), command_data);
+        let get_arguments = create_parser(data.unnamed.iter().map(|f| &f.ty), data.unnamed.len(), parser_type);
         let i = (0..data.unnamed.len()).map(syn::Index::from);
         quote::quote! {
             #get_arguments
@@ -49,9 +49,9 @@ pub fn impl_parse_args_unit() -> proc_macro2::TokenStream {
 fn create_parser<'a>(
     types: impl Iterator<Item = &'a Type>,
     count_args: usize,
-    data: ParserPayloadData
+    parser_type: ParserType
 ) -> proc_macro2::TokenStream {
-    match data.parser_type {
+    match parser_type {
         ParserType::Regex(regex) => {
             // there's already a assertion done in lower levels to make sure regex field exists when parser is selected
             let function_to_parse = create_regex_parser(types, count_args, regex, ParserType::Regex(Default::default()));

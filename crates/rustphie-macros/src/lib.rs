@@ -13,7 +13,7 @@ use crate::callbackquery::CallbackDeriveData;
 use crate::command::CommandData;
 use crate::errors::BasicErrors;
 use crate::fields_parse::{impl_parse_args_named, impl_parse_args_unit, impl_parse_args_unnamed};
-use crate::parsers::ParserPayloadData;
+use crate::parsers::ParserType;
 
 mod attr;
 mod command;
@@ -39,7 +39,7 @@ pub fn derive_callbackquery(tokens: TokenStream) -> TokenStream {
     let cb_data = get_or_return!(CallbackDeriveData::try_from(attrs.as_slice()).map_err(|e| TokenStream::from(Error::new(input.span(), e).to_compile_error())));
 
     let ident = &input.ident;
-    let parser = generate_field_parsers(&struct_data.fields, cb_data.clone());
+    let parser = get_or_return!(generate_field_parsers(&struct_data.fields, cb_data.parser.clone()).map_err(|e| TokenStream::from(Error::new(input.span(), e).to_compile_error())));
     let fn_parser = impl_parse_callbackquery(cb_data.clone(), parser);
     let new_fn = impl_callbackquery_derive_new_fn(&struct_data.fields, cb_data, ident.clone());
     let res = TokenStream::from(
@@ -61,25 +61,25 @@ pub fn derive_command(tokens: TokenStream) -> TokenStream {
     let attrs = get_or_return!(parse_attributes_command(&input.attrs).map_err(|e| e.to_compile_error().into()));
     let command = get_or_return!(CommandData::try_from(&attrs.as_slice()).map_err(|e| TokenStream::from(Error::new(input.span(), e).to_compile_error())));
 
-    let ident = &input.ident;
-    let parser = generate_field_parsers(&struct_data.fields, command.clone());
+    let ident = input.ident.clone();
+    let parser = get_or_return!(generate_field_parsers(&struct_data.fields, command.parser_type.clone()).map_err(|e| TokenStream::from(Error::new(input.span(), e).to_compile_error())));
     let fn_parse = impl_parse(command, parser);
-    let res = TokenStream::from(
-        quote! {
-                impl rustphie_helpers::Command for #ident {
-                    #fn_parse
-                }
-            }
-    );
+    let res = TokenStream::from(command_trait_impl_gen(ident, fn_parse));
     // eprintln!("{}", res);
     res
 }
 
-fn generate_field_parsers<T: Into<ParserPayloadData>>(field_type: &Fields, data: T) -> proc_macro2::TokenStream {
+fn generate_field_parsers(field_type: &Fields, parser_type: Option<ParserType>) -> Result<proc_macro2::TokenStream, BasicErrors> {
     match field_type {
-        Fields::Named(field_data) => impl_parse_args_named(field_data, data.into()),
-        Fields::Unnamed(field_data) => impl_parse_args_unnamed(field_data, data.into()),
-        Fields::Unit => impl_parse_args_unit(),
+        Fields::Named(field_data) => {
+            if parser_type.is_none() { return Err(BasicErrors::FailedToExtractParserType); }
+            Ok(impl_parse_args_named(field_data, parser_type.unwrap()))
+        },
+        Fields::Unnamed(field_data) => {
+            if parser_type.is_none() { return Err(BasicErrors::FailedToExtractParserType); }
+            Ok(impl_parse_args_unnamed(field_data, parser_type.unwrap()))
+        },
+        Fields::Unit => Ok(impl_parse_args_unit()),
     }
 }
 
@@ -181,6 +181,14 @@ fn bare_func_gen(ident: Vec<Ident>, types: Vec<Type>, prefix: String) -> proc_ma
         fn new(#(#ident: #types),*) -> String {
             let data = vec![#prefix.to_string(), #(#ident.to_string()),*];
             data.join("_".into())
+        }
+    }
+}
+
+fn command_trait_impl_gen(ident: Ident, func: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+    quote! {
+        impl rustphie_helpers::Command for #ident {
+            #func
         }
     }
 }

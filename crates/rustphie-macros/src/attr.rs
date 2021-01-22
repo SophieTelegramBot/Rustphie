@@ -2,27 +2,26 @@ use syn::{LitStr, Token};
 use syn::parse::{Parse, ParseBuffer};
 
 pub enum CommandAttributes {
-    Regex,
     Parser,
     Command,
-    Separator,
+    Data,
 }
 
 impl Parse for CommandAttributes {
     fn parse(input: &ParseBuffer) -> Result<Self, syn::Error> {
         let argument = input.parse::<syn::Ident>()?;
         match argument.to_string().as_str() {
-            "regex" => Ok(Self::Regex),
             "command" => Ok(Self::Command),
             "parser" => Ok(Self::Parser),
-            "separator" | "sep" | "delim" => Ok(Self::Separator),
+            "separator" | "sep" | "delim" | "regex" => Ok(Self::Data),
             _ => Err(input.error("Unexpected argument")),
         }
     }
 }
 
 pub enum CallbackQueryAttributes {
-    Prefix
+    Prefix,
+    Delimiter,
 }
 
 impl Parse for CallbackQueryAttributes {
@@ -30,6 +29,7 @@ impl Parse for CallbackQueryAttributes {
         let argument = input.parse::<syn::Ident>()?;
         match argument.to_string().as_str() {
             "prefix" => Ok(Self::Prefix),
+            "delim" | "separator" => Ok(Self::Delimiter),
             _ => Err(input.error("Unexpected argument"))
         }
     }

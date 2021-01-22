@@ -1,10 +1,11 @@
 use crate::attr::{Attr, CallbackQueryAttributes};
 use crate::errors::CallbackDeriveErrors;
-use crate::parsers::{ParserPayloadData, ParserType};
+use crate::parsers::ParserType;
 
 #[derive(Clone)]
 pub(crate) struct CallbackDeriveData {
-    pub(crate) prefix: String
+    pub(crate) prefix: String,
+    pub(crate) parser: Option<ParserType>,
 }
 
 impl CallbackDeriveData {
@@ -12,9 +13,11 @@ impl CallbackDeriveData {
         let attrs = parse_attrs(attrs)?;
 
         let prefix = attrs.prefix;
+        let parser = attrs.parser;
         Ok(
             Self {
-                prefix
+                prefix,
+                parser,
             }
         )
     }
@@ -22,31 +25,30 @@ impl CallbackDeriveData {
 
 pub struct CallbackDeriveAttrs {
     pub(crate) prefix: String,
+    pub(crate) parser: Option<ParserType>,
 }
 
 pub(crate) fn parse_attrs(attrs: &[Attr<CallbackQueryAttributes>]) -> Result<CallbackDeriveAttrs, CallbackDeriveErrors> {
     let mut prefix = None;
+    let mut delim = None;
 
     for attr in attrs {
         match attr.name() {
             CallbackQueryAttributes::Prefix => prefix = Some(attr.value()),
+            CallbackQueryAttributes::Delimiter => delim = Some(attr.value()),
         }
     }
     if prefix.is_none() {
         return Err(CallbackDeriveErrors::NoPrefixGiven)
     }
 
+    let parser = ParserType::try_from(Some("split".into()), delim)
+        .map_err(CallbackDeriveErrors::ParseError)?;
+
     Ok(
         CallbackDeriveAttrs {
             prefix: prefix.unwrap(),
+            parser,
         }
     )
-}
-
-impl Into<ParserPayloadData> for CallbackDeriveData {
-    fn into(self) -> ParserPayloadData {
-        ParserPayloadData {
-            parser_type: ParserType::Split("_".into()),
-        }
-    }
 }

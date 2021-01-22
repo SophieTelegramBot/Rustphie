@@ -8,7 +8,7 @@ mod command_parser_tests {
     #[test]
     fn test_basic() {
         #[derive(Command)]
-        #[command(command = "test", regex = "(.*)")]
+        #[command(command = "test", parser = "re", regex = "(.*)")]
         struct Command {
             arg: String,
         }
@@ -20,7 +20,7 @@ mod command_parser_tests {
     #[test]
     fn test_option_none_arg() {
         #[derive(Command)]
-        #[command(command = "test", regex = "(meow|)")]
+        #[command(command = "test", parser = "re", regex = "(meow|)")]
         struct Command {
             arg: OptionArg<String>
         }
@@ -32,7 +32,7 @@ mod command_parser_tests {
     #[test]
     fn test_option_some_arg() {
         #[derive(Command)]
-        #[command(command = "test", regex = "(meow|)")]
+        #[command(command = "test", parser = "re", regex = "(meow|)")]
         struct Command {
             arg: OptionArg<String>
         }
@@ -41,7 +41,45 @@ mod command_parser_tests {
         assert_eq!(res.unwrap().arg.as_ref().unwrap(), &"meow".to_string());
     }
 
+    #[test]
+    fn test_tuple_struct() {
+        #[derive(Command)]
+        #[command(command = "test", parser = "re", regex = "(meow)")]
+        struct Test(String);
+
+        let res = Test::parse("/test meow", "");
+        assert_eq!(res.unwrap().0, "meow");
+    }
+
+    #[test]
+    fn test_empty_args() {
+        #[derive(Command)]
+        #[command(command = "test")]
+        struct Test;
+
+        let res = Test::parse("/test", "");
+        assert!(res.is_ok());
+    }
+
+    #[test]
+    fn test_bot_username_fail() {
+        #[derive(Command)]
+        #[command(command = "test")]
+        struct Test;
+
+        let res = Test::parse("/test@notbot", "bot");
+        assert!(res.is_err());
+    }
+
+    #[test]
+    fn test_bot_username_pass() {
+        #[derive(Command)]
+        #[command(command = "test")]
+        struct Test;
+
+        let res = Test::parse("/test@bot", "bot");
+        assert!(res.is_ok());
+    }
+
     // TODO: test failure cases
-    // TODO: test with bot username
-    // TODO: test with empty args
 }

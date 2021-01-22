@@ -21,6 +21,7 @@ impl Display for CommandsError {
 #[derive(Debug)]
 pub enum BasicErrors {
     CanBeUsedOnlyInStruct,
+    FailedToExtractParserType,
 }
 
 impl BasicErrors {
@@ -36,8 +37,9 @@ impl BasicErrors {
 
 impl Display for BasicErrors {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        match *self {
-            Self::CanBeUsedOnlyInStruct => write!(f, "Can be used only in struct")
+        match self {
+            Self::CanBeUsedOnlyInStruct => write!(f, "Can be used only in struct"),
+            Self::FailedToExtractParserType => write!(f, "Failed to determine the parser type, missing `parser` field!"),
         }
     }
 }
@@ -62,14 +64,16 @@ impl Display for ParserTypeErrors {
 }
 
 #[derive(Debug)]
-pub enum CallbackDeriveErrors {
-    NoPrefixGiven
+pub(crate) enum CallbackDeriveErrors {
+    NoPrefixGiven,
+    ParseError(ParserTypeErrors),
 }
 
 impl Display for CallbackDeriveErrors {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        match *self {
-            Self::NoPrefixGiven => write!(f, "No prefix were given!")
+        match self {
+            Self::NoPrefixGiven => write!(f, "No prefix were given!"),
+            Self::ParseError(e) => write!(f, "Failed to extract parser type: {}", e),
         }
     }
 }
