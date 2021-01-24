@@ -39,16 +39,14 @@ pub fn derive_callbackquery(tokens: TokenStream) -> TokenStream {
     let parser = get_or_return!(generate_field_parsers(&struct_data.fields, cb_data.parser.clone()).map_err(|e| TokenStream::from(Error::new(input.span(), e).to_compile_error())));
     let fn_parser = impl_parse_callbackquery(cb_data.clone(), parser);
     let new_fn = impl_callbackquery_derive_new_fn(&struct_data.fields, cb_data, ident.clone());
-    let res = TokenStream::from(
+    TokenStream::from(
         quote! {
             #new_fn
             impl rustphie_helpers::CallbackQuery for #ident {
                 #fn_parser
             }
         }
-    );
-    // eprintln!("{}", res);
-    res
+    )
 }
 
 #[proc_macro_derive(Command, attributes(command))]
@@ -61,9 +59,7 @@ pub fn derive_command(tokens: TokenStream) -> TokenStream {
     let ident = input.ident.clone();
     let parser = get_or_return!(generate_field_parsers(&struct_data.fields, command.parser_type.clone()).map_err(|e| TokenStream::from(Error::new(input.span(), e).to_compile_error())));
     let fn_parse = impl_parse(command, parser);
-    let res = TokenStream::from(command_trait_impl_gen(ident, fn_parse));
-    // eprintln!("{}", res);
-    res
+    TokenStream::from(command_trait_impl_gen(ident, fn_parse))
 }
 
 fn generate_field_parsers(field_type: &Fields, parser_type: Option<ParserType>) -> Result<proc_macro2::TokenStream, BasicErrors> {
