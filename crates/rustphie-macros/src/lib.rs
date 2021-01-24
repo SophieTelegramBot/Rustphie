@@ -1,7 +1,3 @@
-extern crate proc_macro;
-extern crate quote;
-extern crate syn;
-
 use proc_macro::TokenStream;
 
 use quote::quote;
