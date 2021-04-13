@@ -31,7 +31,10 @@ pub(crate) fn impl_parse(info: CommandData, parser: proc_macro2::TokenStream) ->
     }
 }
 
-pub(crate) fn impl_parse_callbackquery(info: CallbackDeriveData, parser: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+pub(crate) fn impl_parse_callbackquery(
+    info: CallbackDeriveData, 
+    parser: proc_macro2::TokenStream
+) -> proc_macro2::TokenStream {
     let prefix = info.prefix + "_";
     quote! {
         fn parse(data: String) -> Result<Self, rustphie_helpers::ParseError> {

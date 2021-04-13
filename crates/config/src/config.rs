@@ -4,7 +4,7 @@ use serde::Deserialize;
 /// Contains bot configurations
 ///
 /// # Example
-/// ```ignore
+/// ```no_compile
 /// # use config::Configuration;
 /// # use std::env::set_var;
 /// # fn main() {
