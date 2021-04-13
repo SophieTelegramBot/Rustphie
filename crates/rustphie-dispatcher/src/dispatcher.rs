@@ -19,7 +19,14 @@ impl Dispatcher {
     }
 
     pub async fn propagate_message_update(&self, upd: Message) -> Result<()> {
+        let command = &upd.text()
+            .expect("Got unexpected message type")
+            .split_whitespace()
+            .next()
+            .unwrap() // not possible to be none.
+            [1..];
         for handler in &self.command_handlers {
+            if !handler.0.validate_command(command) { continue }
             handler.0.on_event(upd.clone()).await?
         }
         Ok(())

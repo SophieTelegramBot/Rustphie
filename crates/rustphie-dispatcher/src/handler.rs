@@ -5,6 +5,20 @@ use teloxide::types::Message;
 #[async_trait]
 pub trait Handler: HandlerClone + Send + Sync {
     async fn on_event(&self, event: Message) -> Result<()>;
+    fn command(&self) -> CommandData;
+}
+
+impl dyn Handler {
+    pub(crate) fn validate_command(&self, cmd: &str) -> bool {
+        let command_data = self.command();
+        match command_data {
+            CommandData::Command(got_cmd) => got_cmd.eq(cmd),
+        }
+    }
+}
+
+pub enum CommandData {
+    Command(String)
 }
 
 pub trait HandlerClone {

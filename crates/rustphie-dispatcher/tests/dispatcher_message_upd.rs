@@ -1,8 +1,8 @@
 
 #[cfg(test)]
 mod dispatcher_message_update {
-    use rustphie_dispatcher::{Dispatcher, Handler};
-    use teloxide::types::{Message, MessageKind, Chat, ChatKind, ChatPrivate, MessageNewChatTitle};
+    use rustphie_dispatcher::{Dispatcher, Handler, CommandData};
+    use teloxide::types::{Message, MessageKind, Chat, ChatKind, ChatPrivate, MessageCommon, ForwardKind, ForwardOrigin, MediaKind, MediaText};
     use anyhow::{Result, anyhow};
     use async_trait::async_trait;
     use futures::executor;
@@ -12,13 +12,18 @@ mod dispatcher_message_update {
 
     #[async_trait]
     impl Handler for Handler1 {
-        async fn on_event(&self, event: Message) -> Result<()> {
-            if event.id == 0 { Ok(()) } else { Err(anyhow!("test failed")) }
+        async fn on_event(&self, _: Message) -> Result<()> {
+            Err(anyhow!("error"))
+            // throwing error will help test fn to know event has been propagated successfully
+        }
+
+        fn command(&self) -> CommandData {
+            CommandData::Command(String::from("command"))
         }
     }
 
     #[test]
-    fn test_dispatcher_message_upd() {
+    fn test_dispatcher_propagation() {
         let mut dispatcher = Dispatcher::new();
 
         // add event handler
@@ -31,11 +36,17 @@ mod dispatcher_message_update {
             Chat::new(
                 0,
                 ChatKind::Private(ChatPrivate::new())),
-            MessageKind::NewChatTitle(MessageNewChatTitle::new("test"))
+            MessageKind::Common(
+                MessageCommon::new(
+                    ForwardKind::Origin(ForwardOrigin::new()),
+                    MediaKind::Text(MediaText::new("/command", Vec::new()))
+                )
+            )
         );
 
         // propagate
         let result = executor::block_on(dispatcher.propagate_message_update(msg));
-        assert!(result.is_ok())
+        // if success; event listener would return error
+        assert!(result.is_err())
     }
 }
