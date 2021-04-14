@@ -1,19 +1,11 @@
 use teloxide::dispatching::UpdateWithCx;
 use teloxide::types::Message;
 use teloxide::requests::ResponseResult;
-use teloxide::utils::command::BotCommand;
+use rustphie_dispatcher::Dispatcher;
 
 mod start;
 
-#[derive(BotCommand)]
-#[command(rename = "lowercase")]
-pub enum Commands {
-    Start,
-}
-
-pub async fn handle_updates(cx: UpdateWithCx<Message>, command: Commands) -> ResponseResult<()> {
-    match command {
-        Commands::Start => start::start_command(cx).await?,
-    };
-    Ok(())
+pub fn register_mods(dp: &mut Dispatcher) {
+    log::debug!("Registering modules");
+    dp.add_message_handler(Box::new(start::Start))
 }

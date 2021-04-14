@@ -1,10 +1,13 @@
 use async_trait::async_trait;
 use anyhow::Result;
 use teloxide::types::Message;
+use teloxide::dispatching::UpdateWithCx;
+use teloxide::adaptors::AutoSend;
+use teloxide::Bot;
 
 #[async_trait]
 pub trait Handler: HandlerClone + Send + Sync {
-    async fn on_event(&self, event: Message) -> Result<()>;
+    async fn on_event(&self, event: &UpdateWithCx<AutoSend<Bot>, Message>) -> Result<()>;
     fn command(&self) -> CommandData;
 }
 

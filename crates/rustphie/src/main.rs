@@ -1,6 +1,12 @@
 use teloxide::Bot;
-
 use config::Configuration;
+use rustphie_dispatcher::Dispatcher;
+use teloxide::dispatching::DispatcherHandlerRx;
+use teloxide::types::Message;
+use teloxide::prelude::{DispatcherHandlerRxExt, StreamExt, RequesterExt};
+use teloxide::adaptors::AutoSend;
+use tokio_stream::wrappers::UnboundedReceiverStream;
+use std::sync::Arc;
 
 mod modules;
 
@@ -14,10 +20,37 @@ async fn main() -> anyhow::Result<()> {
 
     // init bot
     log::debug!("Initiating bot");
-    let bot = Bot::builder()
-        .token(bot_config.token)
-        .build();
+    let bot = Bot::new(bot_config.token)
+        .auto_send();
+    log::info!("Successfully initiated bot");
 
-    // todo: bot_name? static lifetime wth???
-    Ok(teloxide::commands_repl(bot, "", modules::handle_updates).await)
+    log::debug!("Initiating dispatcher");
+    let mut dispatcher = Dispatcher::new();
+    modules::register_mods(&mut dispatcher);
+    log::debug!("Successfully registered all modules");
+
+    // drop mut
+    let dispatcher = Arc::new(dispatcher);
+
+    log::debug!("Registering dispatcher with teloxide");
+    let listener = teloxide::dispatching::Dispatcher::new(bot)
+        .messages_handler(move |rx: DispatcherHandlerRx<AutoSend<Bot>, Message>| {
+            UnboundedReceiverStream::new(rx).text_messages().for_each_concurrent(
+                None,
+                move |(cx, cmd)| {
+                    let handler = Arc::clone(&dispatcher);
+
+                    async move {
+                        handler.propagate_message_update(cx, cmd).await;
+                    }
+                }
+            )
+        });
+    log::info!("Successfully registered dispatcher with teloxide listener");
+    log::info!("Listening for updates");
+    listener
+        .dispatch()
+        .await;
+
+    Ok(())
 }
