@@ -29,7 +29,7 @@ async fn main() -> anyhow::Result<()> {
     modules::register_mods(&mut dispatcher);
     log::debug!("Successfully registered all modules");
 
-    Dispatcher::dispatch(dispatcher, bot)
+    dispatcher.dispatch(bot)
         .await;
     Ok(())
 }

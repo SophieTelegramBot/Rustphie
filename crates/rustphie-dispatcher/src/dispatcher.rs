@@ -48,8 +48,8 @@ impl Dispatcher {
         Ok(())
     }
 
-    pub async fn dispatch(dispatcher: Self, bot: AutoSend<Bot>,) {
-        let self_arc = Arc::new(dispatcher);
+    pub async fn dispatch(self, bot: AutoSend<Bot>,) {
+        let self_arc = Arc::new(self);
         log::debug!("Registering dispatcher with teloxide");
         let listener = teloxide::dispatching::Dispatcher::new(bot)
             .messages_handler(move |rx: DispatcherHandlerRx<AutoSend<Bot>, Message>| {
