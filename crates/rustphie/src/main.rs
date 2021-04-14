@@ -29,28 +29,7 @@ async fn main() -> anyhow::Result<()> {
     modules::register_mods(&mut dispatcher);
     log::debug!("Successfully registered all modules");
 
-    // drop mut
-    let dispatcher = Arc::new(dispatcher);
-
-    log::debug!("Registering dispatcher with teloxide");
-    let listener = teloxide::dispatching::Dispatcher::new(bot)
-        .messages_handler(move |rx: DispatcherHandlerRx<AutoSend<Bot>, Message>| {
-            UnboundedReceiverStream::new(rx).text_messages().for_each_concurrent(
-                None,
-                move |(cx, cmd)| {
-                    let handler = Arc::clone(&dispatcher);
-
-                    async move {
-                        handler.propagate_message_update(cx, cmd).await;
-                    }
-                }
-            )
-        });
-    log::info!("Successfully registered dispatcher with teloxide listener");
-    log::info!("Listening for updates");
-    listener
-        .dispatch()
+    Dispatcher::dispatch(dispatcher, bot)
         .await;
-
     Ok(())
 }

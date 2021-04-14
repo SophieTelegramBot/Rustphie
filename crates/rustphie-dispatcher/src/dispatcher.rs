@@ -4,6 +4,9 @@ use crate::handler::{InternalHandlerStruct, Handler};
 use teloxide::dispatching::UpdateWithCx;
 use teloxide::adaptors::AutoSend;
 use teloxide::Bot;
+use teloxide::prelude::{DispatcherHandlerRx, DispatcherHandlerRxExt, StreamExt};
+use tokio_stream::wrappers::UnboundedReceiverStream;
+use std::sync::Arc;
 
 pub struct Dispatcher {
     command_handlers: Vec<InternalHandlerStruct>
@@ -28,7 +31,7 @@ impl Dispatcher {
         }
     }
 
-    pub async fn propagate_message_update(&self, upd: UpdateWithCx<AutoSend<Bot>, Message>, text: String) -> Result<()> {
+    async fn propagate_message_update(&self, upd: UpdateWithCx<AutoSend<Bot>, Message>, text: String) -> Result<()> {
         log::debug!(
             "Received update. ID: {update_id}",
             update_id=upd.update.id,
@@ -43,5 +46,28 @@ impl Dispatcher {
             handler.0.on_event(&upd).await?
         }
         Ok(())
+    }
+
+    pub async fn dispatch(dispatcher: Self, bot: AutoSend<Bot>,) {
+        let self_arc = Arc::new(dispatcher);
+        log::debug!("Registering dispatcher with teloxide");
+        let listener = teloxide::dispatching::Dispatcher::new(bot)
+            .messages_handler(move |rx: DispatcherHandlerRx<AutoSend<Bot>, Message>| {
+                UnboundedReceiverStream::new(rx).text_messages().for_each_concurrent(
+                    None,
+                    move |(cx, cmd)| {
+                        let dispatcher = Arc::clone(&self_arc);
+
+                        async move {
+                            dispatcher.propagate_message_update(cx, cmd).await;
+                        }
+                    }
+                )
+            });
+        log::info!("Successfully registered dispatcher with teloxide listener");
+        log::debug!("Listening for updates");
+        listener
+            .dispatch()
+            .await;
     }
 }
